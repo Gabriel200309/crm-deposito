@@ -42,7 +42,7 @@ export default async function ProductsPage({
       }
     : {};
 
-  const [products, canCreate, canEdit, canDelete] = await Promise.all([
+  const [products, canCreate, canEdit, canDelete, canMoveStock] = await Promise.all([
     prisma.product.findMany({
       where,
       include: { category: true, brand: true, unit: true },
@@ -52,6 +52,7 @@ export default async function ProductsPage({
     hasPermission(actor.roleId, MODULES.PRODUTOS, PermissionAction.CREATE),
     hasPermission(actor.roleId, MODULES.PRODUTOS, PermissionAction.EDIT),
     hasPermission(actor.roleId, MODULES.PRODUTOS, PermissionAction.DELETE),
+    hasPermission(actor.roleId, MODULES.ESTOQUE, PermissionAction.CREATE),
   ]);
 
   return (
@@ -119,13 +120,37 @@ export default async function ProductsPage({
                   <TableCell>{product.category.name}</TableCell>
                   <TableCell>{product.unit.code}</TableCell>
                   <TableCell>{formatCurrency(product.salePrice)}</TableCell>
-                  <TableCell>{product.currentStock.toString()}</TableCell>
+                  <TableCell>
+                    {product.currentStock.toString()}
+                    {Number(product.currentStock) <= 0 ? (
+                      <Badge variant="destructive" className="ml-2">
+                        Sem estoque
+                      </Badge>
+                    ) : (
+                      product.minStock !== null &&
+                      Number(product.currentStock) <= Number(product.minStock) && (
+                        <Badge variant="secondary" className="ml-2">
+                          Baixo
+                        </Badge>
+                      )
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={product.active ? "default" : "secondary"}>
                       {product.active ? "Ativo" : "Inativo"}
                     </Badge>
                   </TableCell>
                   <TableCell className="flex justify-end gap-2">
+                    {canMoveStock && (
+                      <Button
+                        render={<Link href={`/estoque/nova?productId=${product.id}`} />}
+                        nativeButton={false}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Movimentar
+                      </Button>
+                    )}
                     {canEdit && (
                       <Button
                         render={<Link href={`/produtos/${product.id}/editar`} />}

@@ -1,15 +1,27 @@
-import { Users, ShieldCheck, PackageSearch, Receipt } from "lucide-react";
+import Link from "next/link";
+import { Users, ShieldCheck, PackageSearch, Receipt, PackageX, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireUser } from "@/lib/rbac";
+import { requireUser, hasPermission } from "@/lib/rbac";
+import { MODULES, PermissionAction } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardPage() {
   const user = await requireUser();
 
-  const [activeUsers, roleCount] = await Promise.all([
+  const canViewStock = await hasPermission(user.roleId, MODULES.ESTOQUE, PermissionAction.VIEW);
+
+  const [activeUsers, roleCount, outOfStock, lowStockCandidates] = await Promise.all([
     prisma.user.count({ where: { active: true } }),
     prisma.role.count(),
+    canViewStock ? prisma.product.count({ where: { active: true, currentStock: { lte: 0 } } }) : null,
+    canViewStock
+      ? prisma.product.findMany({
+          where: { active: true, currentStock: { gt: 0 }, minStock: { not: null } },
+          select: { currentStock: true, minStock: true },
+        })
+      : null,
   ]);
+  const lowStock = lowStockCandidates?.filter((p) => Number(p.currentStock) <= Number(p.minStock)).length ?? null;
 
   return (
     <div className="space-y-6">
@@ -43,6 +55,34 @@ export default async function DashboardPage() {
             <div className="text-2xl font-bold">{roleCount}</div>
           </CardContent>
         </Card>
+
+        {canViewStock && (
+          <Link href="/estoque">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Produtos sem estoque</CardTitle>
+                <PackageX className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{outOfStock}</div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
+        {canViewStock && (
+          <Link href="/estoque">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Produtos com estoque baixo</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{lowStock}</div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
         <Card className="opacity-60">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
