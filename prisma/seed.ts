@@ -12,6 +12,7 @@ const MODULES = {
   DASHBOARD: "dashboard",
   CLIENTES: "clientes",
   LEADS: "leads",
+  PRODUTOS: "produtos",
 } as const;
 
 const CRUD = [
@@ -28,12 +29,15 @@ const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
   ...CRUD.map((action) => ({ module: MODULES.PERFIS, action })),
   ...CRUD.map((action) => ({ module: MODULES.CLIENTES, action })),
   ...CRUD.map((action) => ({ module: MODULES.LEADS, action })),
+  ...CRUD.map((action) => ({ module: MODULES.PRODUTOS, action })),
 ];
 
 // Perfis padrão do sistema (seção 22 do escopo). Todo perfil recebe acesso ao
 // dashboard; os módulos abaixo são concedidos conforme cada fase é
-// implementada (Estoquista/Financeiro/Fiscal/Entregador ainda não têm módulo
-// próprio, então ficam só com o dashboard por enquanto).
+// implementada (Financeiro/Fiscal/Entregador ainda não têm módulo próprio,
+// então ficam só com o dashboard por enquanto). `viewOnlyModules` concede
+// apenas a permissão de visualizar (ex: vendedor/estoquista consultando o
+// catálogo sem poder alterar preços ou cadastro).
 const ROLE_SEED = [
   {
     name: "Administrador",
@@ -43,14 +47,20 @@ const ROLE_SEED = [
   {
     name: "Gerente",
     description: "Vendas, clientes, estoque, financeiro e relatórios.",
-    modules: [MODULES.CLIENTES, MODULES.LEADS],
+    modules: [MODULES.CLIENTES, MODULES.LEADS, MODULES.PRODUTOS],
   },
   {
     name: "Vendedor",
     description: "Clientes, leads, orçamentos, pedidos e suas vendas.",
     modules: [MODULES.CLIENTES, MODULES.LEADS],
+    viewOnlyModules: [MODULES.PRODUTOS],
   },
-  { name: "Estoquista", description: "Estoque, separação, entrada e saída de mercadorias.", modules: [] },
+  {
+    name: "Estoquista",
+    description: "Estoque, separação, entrada e saída de mercadorias.",
+    modules: [],
+    viewOnlyModules: [MODULES.PRODUTOS],
+  },
   { name: "Financeiro", description: "Contas, recebimentos, pagamentos e inadimplência.", modules: [] },
   { name: "Fiscal", description: "Notas fiscais e documentos fiscais.", modules: [] },
   { name: "Entregador", description: "Entregas atribuídas ao entregador.", modules: [] },
@@ -58,6 +68,33 @@ const ROLE_SEED = [
 
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "gabriel.camiloo20211@gmail.com";
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Deposito@123";
+
+// Unidades de medida padrão (seção 6 do escopo).
+const UNIT_SEED = [
+  { code: "UN", label: "Unidade" },
+  { code: "KG", label: "Quilograma" },
+  { code: "M", label: "Metro" },
+  { code: "M2", label: "Metro quadrado" },
+  { code: "M3", label: "Metro cúbico" },
+  { code: "LT", label: "Litro" },
+  { code: "CX", label: "Caixa" },
+  { code: "SC", label: "Saco" },
+  { code: "PC", label: "Peça" },
+  { code: "ROLO", label: "Rolo" },
+  { code: "BARRA", label: "Barra" },
+  { code: "FARDO", label: "Fardo" },
+];
+
+// Categorias e subcategorias padrão (seção 7 do escopo) — ponto de partida
+// configurável pelo administrador, não uma lista fechada.
+const CATEGORY_SEED: Array<{ name: string; children: string[] }> = [
+  { name: "Materiais básicos", children: ["Cimento", "Areia", "Brita", "Argamassa", "Cal"] },
+  { name: "Elétrica", children: ["Fios", "Cabos", "Tomadas", "Interruptores", "Disjuntores", "Conduítes"] },
+  { name: "Hidráulica", children: ["Tubos", "Conexões", "Registros", "Torneiras", "Caixas d'água"] },
+  { name: "Ferramentas", children: ["Furadeiras", "Serras", "Martelos", "Ferramentas manuais"] },
+  { name: "Pintura", children: ["Tintas", "Massas", "Rolos", "Pincéis", "Solventes"] },
+  { name: "Acabamento", children: ["Pisos", "Revestimentos", "Rejuntes", "Louças", "Metais"] },
+];
 
 async function main() {
   const permissions = await Promise.all(
@@ -82,12 +119,16 @@ async function main() {
     });
     roles.set(roleSeed.name, role);
 
+    const viewOnlyModules = (roleSeed as { viewOnlyModules?: readonly string[] }).viewOnlyModules ?? [];
     const grantedPermissionIds = roleSeed.allPermissions
       ? permissions.map((p) => p.id)
       : [
           dashboardViewPermission.id,
           ...permissions
             .filter((p) => (roleSeed.modules as readonly string[]).includes(p.module))
+            .map((p) => p.id),
+          ...permissions
+            .filter((p) => viewOnlyModules.includes(p.module) && p.action === PermissionAction.VIEW)
             .map((p) => p.id),
         ];
 
@@ -113,6 +154,27 @@ async function main() {
     },
     update: {},
   });
+
+  for (const unit of UNIT_SEED) {
+    await prisma.unit.upsert({
+      where: { code: unit.code },
+      create: unit,
+      update: { label: unit.label },
+    });
+  }
+
+  for (const category of CATEGORY_SEED) {
+    const parent =
+      (await prisma.category.findFirst({ where: { parentId: null, name: category.name } })) ??
+      (await prisma.category.create({ data: { name: category.name } }));
+    for (const childName of category.children) {
+      await prisma.category.upsert({
+        where: { parentId_name: { parentId: parent.id, name: childName } },
+        create: { name: childName, parentId: parent.id },
+        update: {},
+      });
+    }
+  }
 
   console.log("\nSeed concluído.");
   console.log(`Login: ${ADMIN_EMAIL}`);
