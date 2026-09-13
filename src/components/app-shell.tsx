@@ -13,6 +13,7 @@ import {
   Contact,
   Kanban,
   Package,
+  Boxes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -39,6 +40,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/clientes": Contact,
   "/leads": Kanban,
   "/produtos": Package,
+  "/estoque": Boxes,
   "/usuarios": Users,
   "/perfis": ShieldCheck,
 };

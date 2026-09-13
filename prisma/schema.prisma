@@ -73,10 +73,11 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  role              Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  auditLogs         AuditLog[]
-  activitiesCreated Activity[]
-  leadsResponsible  Lead[]
+  role                  Role            @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  auditLogs             AuditLog[]
+  activitiesCreated     Activity[]
+  leadsResponsible      Lead[]
+  stockMovementsCreated StockMovement[]
 
   @@map("users")
 }
@@ -388,8 +389,47 @@ model Product {
   brand    Brand?   @relation(fields: [brandId], references: [id], onDelete: SetNull)
   unit     Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
 
+  stockMovements StockMovement[]
+
   @@index([categoryId])
   @@index([brandId])
   @@index([name])
   @@map("products")
+}
+
+// ---------------------------------------------------------------------------
+// FASE 4 — Estoque: entradas, saídas e demais movimentações, sempre em
+// registros imutáveis (nunca se edita/exclui uma movimentação — um erro se
+// corrige com uma movimentação de compensação). `Product.currentStock` só é
+// alterado dentro da mesma transação que cria a movimentação correspondente.
+// "Venda" e "devolução" como tipos de movimentação ficam para quando Pedidos
+// (Fase 5) e Devoluções existirem e gerarem essas movimentações sozinhos.
+// ---------------------------------------------------------------------------
+
+enum StockMovementType {
+  ENTRADA
+  SAIDA
+  AJUSTE_ENTRADA
+  AJUSTE_SAIDA
+  PERDA
+  AVARIA
+  TRANSFERENCIA
+}
+
+model StockMovement {
+  id          String            @id @default(cuid())
+  productId   String
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(12, 3) // sempre positiva; a direção vem do `type`
+  reason      String?
+  document    String? // documento relacionado (nota fiscal, pedido de compra, etc.)
+  createdById String?
+  createdAt   DateTime          @default(now())
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([type])
+  @@map("stock_movements")
 }

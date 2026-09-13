@@ -13,6 +13,7 @@ const MODULES = {
   CLIENTES: "clientes",
   LEADS: "leads",
   PRODUTOS: "produtos",
+  ESTOQUE: "estoque",
 } as const;
 
 const CRUD = [
@@ -22,7 +23,9 @@ const CRUD = [
   PermissionAction.DELETE,
 ];
 
-// Módulos de gestão usam CRUD completo; dashboard é só leitura.
+// Módulos de gestão usam CRUD completo; dashboard é só leitura. Estoque só
+// tem visualizar/criar — movimentações são registros imutáveis, não se
+// editam nem se excluem (corrige-se com uma nova movimentação).
 const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
   { module: MODULES.DASHBOARD, action: PermissionAction.VIEW },
   ...CRUD.map((action) => ({ module: MODULES.USUARIOS, action })),
@@ -30,6 +33,8 @@ const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
   ...CRUD.map((action) => ({ module: MODULES.CLIENTES, action })),
   ...CRUD.map((action) => ({ module: MODULES.LEADS, action })),
   ...CRUD.map((action) => ({ module: MODULES.PRODUTOS, action })),
+  { module: MODULES.ESTOQUE, action: PermissionAction.VIEW },
+  { module: MODULES.ESTOQUE, action: PermissionAction.CREATE },
 ];
 
 // Perfis padrão do sistema (seção 22 do escopo). Todo perfil recebe acesso ao
@@ -47,7 +52,7 @@ const ROLE_SEED = [
   {
     name: "Gerente",
     description: "Vendas, clientes, estoque, financeiro e relatórios.",
-    modules: [MODULES.CLIENTES, MODULES.LEADS, MODULES.PRODUTOS],
+    modules: [MODULES.CLIENTES, MODULES.LEADS, MODULES.PRODUTOS, MODULES.ESTOQUE],
   },
   {
     name: "Vendedor",
@@ -58,7 +63,7 @@ const ROLE_SEED = [
   {
     name: "Estoquista",
     description: "Estoque, separação, entrada e saída de mercadorias.",
-    modules: [],
+    modules: [MODULES.ESTOQUE],
     viewOnlyModules: [MODULES.PRODUTOS],
   },
   { name: "Financeiro", description: "Contas, recebimentos, pagamentos e inadimplência.", modules: [] },
