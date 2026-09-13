@@ -5,13 +5,17 @@ import { AppShell, type NavItem } from "@/components/app-shell";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
 
-  const [canViewUsers, canViewRoles] = await Promise.all([
+  const [canViewUsers, canViewRoles, canViewCustomers, canViewLeads] = await Promise.all([
     hasPermission(user.roleId, MODULES.USUARIOS, PermissionAction.VIEW),
     hasPermission(user.roleId, MODULES.PERFIS, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.CLIENTES, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.LEADS, PermissionAction.VIEW),
   ]);
 
   const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard" },
+    ...(canViewCustomers ? [{ href: "/clientes", label: "Clientes" }] : []),
+    ...(canViewLeads ? [{ href: "/leads", label: "Funil de vendas" }] : []),
     ...(canViewUsers ? [{ href: "/usuarios", label: "Usuários" }] : []),
     ...(canViewRoles ? [{ href: "/perfis", label: "Perfis e permissões" }] : []),
   ];

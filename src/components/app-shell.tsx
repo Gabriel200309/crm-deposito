@@ -3,7 +3,16 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Menu, Users, ShieldCheck, LogOut, Warehouse } from "lucide-react";
+import {
+  LayoutDashboard,
+  Menu,
+  Users,
+  ShieldCheck,
+  LogOut,
+  Warehouse,
+  Contact,
+  Kanban,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -26,6 +35,8 @@ export type NavItem = {
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/dashboard": LayoutDashboard,
+  "/clientes": Contact,
+  "/leads": Kanban,
   "/usuarios": Users,
   "/perfis": ShieldCheck,
 };

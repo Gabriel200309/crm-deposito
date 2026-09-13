@@ -10,33 +10,50 @@ const MODULES = {
   USUARIOS: "usuarios",
   PERFIS: "perfis",
   DASHBOARD: "dashboard",
+  CLIENTES: "clientes",
+  LEADS: "leads",
 } as const;
 
-// Módulos de gestão (usuarios/perfis) usam CRUD completo; dashboard é só leitura.
-const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
-  { module: MODULES.DASHBOARD, action: PermissionAction.VIEW },
-  { module: MODULES.USUARIOS, action: PermissionAction.VIEW },
-  { module: MODULES.USUARIOS, action: PermissionAction.CREATE },
-  { module: MODULES.USUARIOS, action: PermissionAction.EDIT },
-  { module: MODULES.USUARIOS, action: PermissionAction.DELETE },
-  { module: MODULES.PERFIS, action: PermissionAction.VIEW },
-  { module: MODULES.PERFIS, action: PermissionAction.CREATE },
-  { module: MODULES.PERFIS, action: PermissionAction.EDIT },
-  { module: MODULES.PERFIS, action: PermissionAction.DELETE },
+const CRUD = [
+  PermissionAction.VIEW,
+  PermissionAction.CREATE,
+  PermissionAction.EDIT,
+  PermissionAction.DELETE,
 ];
 
-// Perfis padrão do sistema (seção 22 do escopo). Os perfis operacionais
-// (Gerente, Vendedor, Estoquista, Financeiro, Fiscal, Entregador) recebem por
-// enquanto apenas acesso ao dashboard — o acesso aos módulos de cada área é
-// concedido quando esses módulos forem implementados nas próximas fases.
+// Módulos de gestão usam CRUD completo; dashboard é só leitura.
+const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
+  { module: MODULES.DASHBOARD, action: PermissionAction.VIEW },
+  ...CRUD.map((action) => ({ module: MODULES.USUARIOS, action })),
+  ...CRUD.map((action) => ({ module: MODULES.PERFIS, action })),
+  ...CRUD.map((action) => ({ module: MODULES.CLIENTES, action })),
+  ...CRUD.map((action) => ({ module: MODULES.LEADS, action })),
+];
+
+// Perfis padrão do sistema (seção 22 do escopo). Todo perfil recebe acesso ao
+// dashboard; os módulos abaixo são concedidos conforme cada fase é
+// implementada (Estoquista/Financeiro/Fiscal/Entregador ainda não têm módulo
+// próprio, então ficam só com o dashboard por enquanto).
 const ROLE_SEED = [
-  { name: "Administrador", description: "Acesso total ao sistema.", allPermissions: true },
-  { name: "Gerente", description: "Vendas, clientes, estoque, financeiro e relatórios." },
-  { name: "Vendedor", description: "Clientes, leads, orçamentos, pedidos e suas vendas." },
-  { name: "Estoquista", description: "Estoque, separação, entrada e saída de mercadorias." },
-  { name: "Financeiro", description: "Contas, recebimentos, pagamentos e inadimplência." },
-  { name: "Fiscal", description: "Notas fiscais e documentos fiscais." },
-  { name: "Entregador", description: "Entregas atribuídas ao entregador." },
+  {
+    name: "Administrador",
+    description: "Acesso total ao sistema.",
+    allPermissions: true,
+  },
+  {
+    name: "Gerente",
+    description: "Vendas, clientes, estoque, financeiro e relatórios.",
+    modules: [MODULES.CLIENTES, MODULES.LEADS],
+  },
+  {
+    name: "Vendedor",
+    description: "Clientes, leads, orçamentos, pedidos e suas vendas.",
+    modules: [MODULES.CLIENTES, MODULES.LEADS],
+  },
+  { name: "Estoquista", description: "Estoque, separação, entrada e saída de mercadorias.", modules: [] },
+  { name: "Financeiro", description: "Contas, recebimentos, pagamentos e inadimplência.", modules: [] },
+  { name: "Fiscal", description: "Notas fiscais e documentos fiscais.", modules: [] },
+  { name: "Entregador", description: "Entregas atribuídas ao entregador.", modules: [] },
 ];
 
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "gabriel.camiloo20211@gmail.com";
@@ -67,7 +84,12 @@ async function main() {
 
     const grantedPermissionIds = roleSeed.allPermissions
       ? permissions.map((p) => p.id)
-      : [dashboardViewPermission.id];
+      : [
+          dashboardViewPermission.id,
+          ...permissions
+            .filter((p) => (roleSeed.modules as readonly string[]).includes(p.module))
+            .map((p) => p.id),
+        ];
 
     for (const permissionId of grantedPermissionIds) {
       await prisma.rolePermission.upsert({
