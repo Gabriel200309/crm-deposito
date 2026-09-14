@@ -17,6 +17,7 @@ const MODULES = {
   PEDIDOS: "pedidos",
   VENDEDORES: "vendedores",
   COMISSOES: "comissoes",
+  FINANCEIRO: "financeiro",
 } as const;
 
 const CRUD = [
@@ -45,6 +46,10 @@ const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
   ...CRUD.map((action) => ({ module: MODULES.VENDEDORES, action })),
   { module: MODULES.COMISSOES, action: PermissionAction.VIEW },
   { module: MODULES.COMISSOES, action: PermissionAction.EDIT },
+  // Financeiro: CRUD normal + "aprovar" (usado para liberar uma venda a
+  // prazo que estoura o limite de crédito do cliente).
+  ...CRUD.map((action) => ({ module: MODULES.FINANCEIRO, action })),
+  { module: MODULES.FINANCEIRO, action: PermissionAction.APPROVE },
 ];
 
 // Perfis padrão do sistema (seção 22 do escopo). Todo perfil recebe acesso ao
@@ -70,6 +75,7 @@ const ROLE_SEED = [
       MODULES.PEDIDOS,
       MODULES.VENDEDORES,
       MODULES.COMISSOES,
+      MODULES.FINANCEIRO,
     ],
   },
   {
@@ -90,7 +96,12 @@ const ROLE_SEED = [
     modules: [MODULES.ESTOQUE],
     viewOnlyModules: [MODULES.PRODUTOS],
   },
-  { name: "Financeiro", description: "Contas, recebimentos, pagamentos e inadimplência.", modules: [] },
+  {
+    name: "Financeiro",
+    description: "Contas, recebimentos, pagamentos e inadimplência.",
+    modules: [MODULES.FINANCEIRO],
+    viewOnlyModules: [MODULES.PEDIDOS, MODULES.CLIENTES],
+  },
   { name: "Fiscal", description: "Notas fiscais e documentos fiscais.", modules: [] },
   { name: "Entregador", description: "Entregas atribuídas ao entregador.", modules: [] },
 ];

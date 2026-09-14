@@ -9,7 +9,10 @@ import { logAudit } from "@/lib/audit";
 import { MODULES, PermissionAction } from "@/lib/permissions";
 import { DeliveryType, OrderStatus, PaymentMethod, StockMovementType } from "@/generated/prisma/enums";
 import { ORDER_FINAL_STATUSES, ORDER_LOCKED_STATUSES, isOrderEditable } from "@/lib/order-labels";
-import { calculateOrderSubtotal } from "@/lib/order-totals";
+import { calculateOrderSubtotal, calculateOrderTotal } from "@/lib/order-totals";
+import { splitInstallments } from "@/lib/finance-labels";
+import { checkCustomerCredit } from "@/lib/credit";
+import { hasPermission } from "@/lib/rbac";
 
 export type ActionState = { success: boolean; error?: string };
 
@@ -34,6 +37,8 @@ const orderSchema = z.object({
   deliveryAddressZip: z.string().optional(),
   discount: z.string().optional(),
   freight: z.string().optional(),
+  installments: z.string().optional(),
+  firstDueDate: z.string().optional(),
   notes: z.string().optional(),
   items: z.string().min(1, "Adicione ao menos um item"),
 });
@@ -53,6 +58,8 @@ function parseOrderForm(formData: FormData) {
     deliveryAddressZip: formData.get("deliveryAddressZip") || undefined,
     discount: formData.get("discount") || undefined,
     freight: formData.get("freight") || undefined,
+    installments: formData.get("installments") || undefined,
+    firstDueDate: formData.get("firstDueDate") || undefined,
     notes: formData.get("notes") || undefined,
     items: formData.get("items"),
   });
@@ -87,6 +94,8 @@ function toOrderData(data: z.infer<typeof orderSchema>) {
     deliveryAddressZip: data.deliveryType === DeliveryType.ENTREGA ? data.deliveryAddressZip || null : null,
     discount: data.discount || "0",
     freight: data.freight || "0",
+    installments: data.installments ? Math.max(1, parseInt(data.installments, 10) || 1) : 1,
+    firstDueDate: data.firstDueDate ? new Date(data.firstDueDate) : null,
     notes: data.notes || null,
   };
 }
@@ -209,13 +218,41 @@ export async function changeOrderStatusAction(
       }
     }
 
-    const subtotal = calculateOrderSubtotal(
-      order.items.map((item) => ({
-        quantity: item.quantity.toString(),
-        unitPrice: item.unitPrice.toString(),
-        discount: item.discount.toString(),
-      })),
-    );
+    const itemsForCalc = order.items.map((item) => ({
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice.toString(),
+      discount: item.discount.toString(),
+    }));
+    const subtotal = calculateOrderSubtotal(itemsForCalc);
+    const total = calculateOrderTotal(itemsForCalc, order.discount.toString(), order.freight.toString());
+
+    if (order.paymentMethod === PaymentMethod.CREDIARIO) {
+      const credit = await checkCustomerCredit(order.customerId, total);
+      if (!credit.withinLimit) {
+        const canApprove = await hasPermission(actor.roleId, MODULES.FINANCEIRO, PermissionAction.APPROVE);
+        if (!canApprove) {
+          return {
+            success: false,
+            error: `Limite de crédito insuficiente: disponível ${credit.available?.toFixed(2)}, necessário ${total.toFixed(2)}. Requer aprovação do Financeiro.`,
+          };
+        }
+        await logAudit({
+          userId: actor.id,
+          action: "order.credit_limit_override",
+          entityType: "Order",
+          entityId: orderId,
+          changes: { limit: credit.limit, used: credit.used, orderTotal: total },
+        });
+      }
+    }
+
+    const dueDates = Array.from({ length: order.installments }, (_, i) => {
+      const base = order.firstDueDate ?? order.createdAt;
+      const date = new Date(base);
+      date.setDate(date.getDate() + i * 30);
+      return date;
+    });
+    const installmentAmounts = splitInstallments(total, order.installments);
 
     await prisma.$transaction(async (tx) => {
       await tx.order.update({ where: { id: orderId }, data: { status } });
@@ -254,6 +291,20 @@ export async function changeOrderStatusAction(
           });
         }
       }
+
+      for (let i = 0; i < order.installments; i++) {
+        await tx.accountsReceivable.create({
+          data: {
+            orderId,
+            customerId: order.customerId,
+            installmentNumber: i + 1,
+            installmentsTotal: order.installments,
+            dueDate: dueDates[i],
+            amount: installmentAmounts[i].toFixed(2),
+            paymentMethod: order.paymentMethod,
+          },
+        });
+      }
     });
   } else {
     await prisma.order.update({
@@ -279,5 +330,6 @@ export async function changeOrderStatusAction(
   revalidatePath("/estoque");
   revalidatePath("/produtos");
   revalidatePath("/comissoes");
+  revalidatePath("/financeiro/receber");
   return { success: true };
 }

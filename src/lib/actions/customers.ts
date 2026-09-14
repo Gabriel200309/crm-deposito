@@ -39,6 +39,7 @@ const baseSchema = z.object({
   addressZip: z.string().optional(),
   classifications: z.array(z.enum(CustomerClassification)).optional(),
   notes: z.string().optional(),
+  creditLimit: z.string().optional(),
 });
 
 const customerSchema = baseSchema.superRefine((data, ctx) => {
@@ -84,6 +85,7 @@ function parseCustomerForm(formData: FormData) {
     addressZip: formData.get("addressZip") || undefined,
     classifications: formData.getAll("classifications"),
     notes: formData.get("notes") || undefined,
+    creditLimit: formData.get("creditLimit") || undefined,
   });
 }
 
@@ -112,6 +114,7 @@ function toCustomerData(data: z.infer<typeof customerSchema>) {
     addressZip: data.addressZip || null,
     classifications: data.classifications ?? [],
     notes: data.notes || null,
+    creditLimit: data.creditLimit ? data.creditLimit : null,
   };
 }
 

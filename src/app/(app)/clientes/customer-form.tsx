@@ -35,6 +35,7 @@ export type CustomerFormValues = {
   addressZip?: string | null;
   classifications?: CustomerClassification[];
   notes?: string | null;
+  creditLimit?: string | null;
 };
 
 export function CustomerForm({
@@ -250,6 +251,26 @@ export function CustomerForm({
               {CLASSIFICATION_LABELS[value]}
             </label>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Crédito</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="creditLimit">Limite de crédito (R$)</Label>
+            <Input
+              id="creditLimit"
+              name="creditLimit"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Sem limite"
+              defaultValue={defaultValues?.creditLimit ?? ""}
+            />
+          </div>
         </CardContent>
       </Card>
 

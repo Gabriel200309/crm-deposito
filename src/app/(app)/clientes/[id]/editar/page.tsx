@@ -23,6 +23,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
         defaultValues={{
           ...customer,
           birthDate: customer.birthDate ? customer.birthDate.toISOString().slice(0, 10) : null,
+          creditLimit: customer.creditLimit ? customer.creditLimit.toString() : null,
         }}
       />
     </div>

@@ -73,12 +73,14 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  role                  Role            @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  auditLogs             AuditLog[]
-  activitiesCreated     Activity[]
-  leadsResponsible      Lead[]
-  stockMovementsCreated StockMovement[]
-  salesperson           Salesperson?
+  role                    Role                @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  auditLogs               AuditLog[]
+  activitiesCreated       Activity[]
+  leadsResponsible        Lead[]
+  stockMovementsCreated   StockMovement[]
+  salesperson             Salesperson?
+  receivablePaymentsTaken ReceivablePayment[]
+  payablesCreated         AccountsPayable[]
 
   @@map("users")
 }
@@ -159,14 +161,17 @@ model Customer {
   classifications CustomerClassification[]
   notes           String?
 
+  creditLimit Decimal? @db.Decimal(12, 2) // limite de crédito para vendas a prazo (crediário)
+
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contacts   CustomerContact[]
-  activities Activity[]
-  leads      Lead[]
-  orders     Order[]
+  contacts    CustomerContact[]
+  activities  Activity[]
+  leads       Lead[]
+  orders      Order[]
+  receivables AccountsReceivable[]
 
   @@unique([cpf])
   @@unique([cnpj])
@@ -515,7 +520,9 @@ model Order {
   validUntil    DateTime? // validade do orçamento
 
   paymentMethod PaymentMethod @default(OUTROS)
-  paymentTerms  String? // condição de pagamento (texto livre; parcelamento formal é Fase 6)
+  paymentTerms  String? // condição de pagamento, descrição livre (ex: "30/60/90")
+  installments  Int           @default(1) // gera essa quantidade de parcelas em contas a receber ao faturar
+  firstDueDate  DateTime? // vencimento da 1ª parcela; parcelas seguintes somam 30 dias cada
 
   deliveryType          DeliveryType @default(RETIRADA)
   deliveryAddressStreet String?
@@ -534,10 +541,11 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  salesperson Salesperson? @relation(fields: [salespersonId], references: [id], onDelete: SetNull)
+  customer    Customer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  salesperson Salesperson?         @relation(fields: [salespersonId], references: [id], onDelete: SetNull)
   items       OrderItem[]
   commissions Commission[]
+  receivables AccountsReceivable[]
 
   @@index([customerId])
   @@index([salespersonId])
@@ -582,4 +590,86 @@ model Commission {
 
   @@index([salespersonId])
   @@map("commissions")
+}
+
+// ---------------------------------------------------------------------------
+// FASE 6 — Financeiro: contas a receber (geradas do pedido ao faturar, com
+// parcelamento), contas a pagar (independente, sem módulo de compras formal)
+// e limite de crédito do cliente.
+//
+// "Vencido"/"pago"/"parcialmente pago" NÃO são armazenados como estado — são
+// calculados a partir de `dueDate` e da soma de `ReceivablePayment` (mesma
+// lógica de não persistir dados derivados usada nos totais do pedido, Fase
+// 5). Só `cancelled` é um estado real, porque não dá pra derivar isso de
+// data/valor. Isso evita precisar de um job agendado só pra "vencer" contas.
+// ---------------------------------------------------------------------------
+
+model AccountsReceivable {
+  id                String   @id @default(cuid())
+  orderId           String
+  customerId        String
+  installmentNumber Int
+  installmentsTotal Int
+  dueDate           DateTime
+  amount            Decimal  @db.Decimal(12, 2)
+
+  paymentMethod PaymentMethod
+  cancelled     Boolean       @default(false)
+  cancelReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order    Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customer Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  payments ReceivablePayment[]
+
+  @@index([customerId])
+  @@index([orderId])
+  @@index([dueDate])
+  @@map("accounts_receivable")
+}
+
+model ReceivablePayment {
+  id            String        @id @default(cuid())
+  receivableId  String
+  amount        Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod
+  paidAt        DateTime      @default(now())
+  createdById   String?
+  notes         String?
+
+  receivable AccountsReceivable @relation(fields: [receivableId], references: [id], onDelete: Cascade)
+  createdBy  User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([receivableId])
+  @@map("receivable_payments")
+}
+
+enum PayableStatus {
+  ABERTO
+  PAGO
+  CANCELADO
+}
+
+model AccountsPayable {
+  id            String        @id @default(cuid())
+  description   String
+  supplierName  String?
+  dueDate       DateTime
+  amount        Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod @default(OUTROS)
+  status        PayableStatus @default(ABERTO)
+  paidAt        DateTime?
+  notes         String?
+  createdById   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([dueDate])
+  @@index([status])
+  @@map("accounts_payable")
 }

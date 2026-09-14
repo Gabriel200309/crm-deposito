@@ -26,6 +26,7 @@ import { X } from "lucide-react";
 import { DeliveryType, PaymentMethod } from "@/generated/prisma/enums";
 import { DELIVERY_TYPE_LABELS, PAYMENT_METHOD_LABELS, formatMoney } from "@/lib/order-labels";
 import { calculateItemSubtotal, calculateOrderSubtotal, calculateOrderTotal } from "@/lib/order-totals";
+import { splitInstallments } from "@/lib/finance-labels";
 import type { ActionState } from "@/lib/actions/orders";
 
 export type OrderProductOption = ProductOption & { salePrice: string };
@@ -55,6 +56,8 @@ export type OrderFormValues = {
   deliveryAddressZip?: string | null;
   discount?: string | null;
   freight?: string | null;
+  installments?: number | null;
+  firstDueDate?: string | null;
   notes?: string | null;
   items: OrderItemDraft[];
 };
@@ -84,9 +87,14 @@ export function OrderForm({
   const [freight, setFreight] = useState(defaultValues?.freight ?? "0");
   const [items, setItems] = useState<OrderItemDraft[]>(defaultValues?.items ?? []);
   const [selectedProductId, setSelectedProductId] = useState("");
+  const [installments, setInstallments] = useState(String(defaultValues?.installments ?? 1));
 
   const subtotal = useMemo(() => calculateOrderSubtotal(items), [items]);
   const total = useMemo(() => calculateOrderTotal(items, discount || 0, freight || 0), [items, discount, freight]);
+  const installmentPreview = useMemo(
+    () => splitInstallments(total, Math.max(1, parseInt(installments, 10) || 1)),
+    [total, installments],
+  );
 
   function addProduct(productId: string) {
     const product = products.find((p) => p.id === productId);
@@ -412,6 +420,45 @@ export function OrderForm({
               <span>{formatMoney(total)}</span>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Parcelamento</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            As parcelas em contas a receber só são geradas quando o pedido é marcado como Faturado.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="installments">Número de parcelas</Label>
+              <Input
+                id="installments"
+                name="installments"
+                type="number"
+                min="1"
+                step="1"
+                value={installments}
+                onChange={(e) => setInstallments(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="firstDueDate">Vencimento da 1ª parcela</Label>
+              <Input
+                id="firstDueDate"
+                name="firstDueDate"
+                type="date"
+                defaultValue={defaultValues?.firstDueDate ?? ""}
+              />
+            </div>
+          </div>
+          {Number(installments) > 1 && (
+            <p className="text-sm text-muted-foreground">
+              {installmentPreview.map((value) => formatMoney(value)).join(" + ")}
+            </p>
+          )}
         </CardContent>
       </Card>
 
