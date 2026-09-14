@@ -1,16 +1,25 @@
 import Link from "next/link";
 import { Users, ShieldCheck, PackageSearch, Receipt, PackageX, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireUser, hasPermission } from "@/lib/rbac";
+import { requireUser, hasPermission, getSalespersonScope } from "@/lib/rbac";
 import { MODULES, PermissionAction } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { OrderStatus } from "@/generated/prisma/enums";
 
 export default async function DashboardPage() {
   const user = await requireUser();
 
-  const canViewStock = await hasPermission(user.roleId, MODULES.ESTOQUE, PermissionAction.VIEW);
+  const [canViewStock, canViewOrders, salespersonScope] = await Promise.all([
+    hasPermission(user.roleId, MODULES.ESTOQUE, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.PEDIDOS, PermissionAction.VIEW),
+    getSalespersonScope(user.roleId, user.id),
+  ]);
 
-  const [activeUsers, roleCount, outOfStock, lowStockCandidates] = await Promise.all([
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const [activeUsers, roleCount, outOfStock, lowStockCandidates, ordersThisMonth] = await Promise.all([
     prisma.user.count({ where: { active: true } }),
     prisma.role.count(),
     canViewStock ? prisma.product.count({ where: { active: true, currentStock: { lte: 0 } } }) : null,
@@ -20,6 +29,17 @@ export default async function DashboardPage() {
           select: { currentStock: true, minStock: true },
         })
       : null,
+    canViewOrders && salespersonScope.type !== "none"
+      ? prisma.order.count({
+          where: {
+            createdAt: { gte: startOfMonth },
+            status: { notIn: [OrderStatus.CANCELADO, OrderStatus.PERDIDO] },
+            salespersonId: salespersonScope.type === "own" ? salespersonScope.salespersonId : undefined,
+          },
+        })
+      : canViewOrders
+        ? 0
+        : null,
   ]);
   const lowStock = lowStockCandidates?.filter((p) => Number(p.currentStock) <= Number(p.minStock)).length ?? null;
 
@@ -84,16 +104,19 @@ export default async function DashboardPage() {
           </Link>
         )}
 
-        <Card className="opacity-60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pedidos do mês</CardTitle>
-            <PackageSearch className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">—</div>
-            <p className="text-xs text-muted-foreground">Disponível na Fase 5 (Comercial)</p>
-          </CardContent>
-        </Card>
+        {canViewOrders && (
+          <Link href="/pedidos">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pedidos do mês</CardTitle>
+                <PackageSearch className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{ordersThisMonth}</div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
         <Card className="opacity-60">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

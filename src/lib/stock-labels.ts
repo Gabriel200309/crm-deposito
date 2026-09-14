@@ -8,11 +8,12 @@ export const STOCK_MOVEMENT_TYPE_LABELS: Record<StockMovementType, string> = {
   [StockMovementType.PERDA]: "Perda",
   [StockMovementType.AVARIA]: "Avaria",
   [StockMovementType.TRANSFERENCIA]: "Transferência",
+  [StockMovementType.VENDA]: "Venda",
 };
 
-// Tipos que o usuário pode lançar manualmente no módulo de estoque. "Venda" e
-// "devolução" não estão aqui: serão criados automaticamente pelas Fases 5
-// (Pedidos) e de Devoluções quando existirem.
+// Tipos que o usuário pode lançar manualmente no módulo de estoque. "Venda"
+// não está aqui: é criada automaticamente quando um pedido chega a FATURADO
+// (Fase 5). "Devolução" fica para quando o módulo de devoluções existir.
 export const MANUAL_STOCK_MOVEMENT_TYPES: StockMovementType[] = [
   StockMovementType.ENTRADA,
   StockMovementType.SAIDA,

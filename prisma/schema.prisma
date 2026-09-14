@@ -78,6 +78,7 @@ model User {
   activitiesCreated     Activity[]
   leadsResponsible      Lead[]
   stockMovementsCreated StockMovement[]
+  salesperson           Salesperson?
 
   @@map("users")
 }
@@ -165,6 +166,7 @@ model Customer {
   contacts   CustomerContact[]
   activities Activity[]
   leads      Lead[]
+  orders     Order[]
 
   @@unique([cpf])
   @@unique([cnpj])
@@ -390,6 +392,7 @@ model Product {
   unit     Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
 
   stockMovements StockMovement[]
+  orderItems     OrderItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -414,6 +417,7 @@ enum StockMovementType {
   PERDA
   AVARIA
   TRANSFERENCIA
+  VENDA
 }
 
 model StockMovement {
@@ -432,4 +436,150 @@ model StockMovement {
   @@index([productId])
   @@index([type])
   @@map("stock_movements")
+}
+
+// ---------------------------------------------------------------------------
+// FASE 5 — Comercial: vendedores, comissões, orçamentos e pedidos.
+//
+// "Orçamento" e "Pedido" são o MESMO registro (`Order`), diferenciados só pelo
+// `status` — a própria seção 8 do escopo já lista "Orçamento" e "Aguardando
+// aprovação" como estágios do pipeline do pedido. Isso satisfaz o requisito
+// de "converter orçamento em pedido sem recadastrar produtos" trivialmente
+// (é a mesma linha, só muda o status), evitando duplicar clientes/itens numa
+// tabela `quotes` separada da `orders`.
+//
+// Comissão é gerada automaticamente quando o pedido chega a FATURADO, usando
+// o percentual padrão do vendedor sobre o subtotal — comissão por
+// produto/categoria (seção 11) fica para uma iteração futura.
+//
+// Baixa de estoque (movimentação tipo VENDA, um item por produto do pedido)
+// também acontece automaticamente ao chegar em FATURADO.
+// ---------------------------------------------------------------------------
+
+model Salesperson {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  cpf            String?
+  phone          String?
+  monthlyGoal    Decimal? @db.Decimal(12, 2)
+  commissionRate Decimal  @default(0) @db.Decimal(5, 2) // percentual padrão, ex: 5.00 = 5%
+  team           String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders      Order[]
+  commissions Commission[]
+
+  @@map("salespeople")
+}
+
+enum OrderStatus {
+  RASCUNHO
+  ORCAMENTO
+  AGUARDANDO_APROVACAO
+  AGUARDANDO_PAGAMENTO
+  PAGAMENTO_CONFIRMADO
+  EM_SEPARACAO
+  SEPARADO
+  FATURADO
+  EM_TRANSPORTE
+  ENTREGUE
+  CANCELADO
+  PERDIDO
+}
+
+enum PaymentMethod {
+  DINHEIRO
+  PIX
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  BOLETO
+  TRANSFERENCIA
+  CREDIARIO
+  OUTROS
+}
+
+enum DeliveryType {
+  RETIRADA
+  ENTREGA
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  number        Int         @default(autoincrement())
+  customerId    String
+  salespersonId String?
+  status        OrderStatus @default(RASCUNHO)
+  validUntil    DateTime? // validade do orçamento
+
+  paymentMethod PaymentMethod @default(OUTROS)
+  paymentTerms  String? // condição de pagamento (texto livre; parcelamento formal é Fase 6)
+
+  deliveryType          DeliveryType @default(RETIRADA)
+  deliveryAddressStreet String?
+  deliveryAddressNumber String?
+  deliveryAddressCity   String?
+  deliveryAddressState  String?
+  deliveryAddressZip    String?
+
+  discount Decimal @default(0) @db.Decimal(12, 2) // desconto adicional sobre o pedido
+  freight  Decimal @default(0) @db.Decimal(12, 2)
+
+  notes        String?
+  lostReason   String? // preenchido quando status = PERDIDO
+  cancelReason String? // preenchido quando status = CANCELADO
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  salesperson Salesperson? @relation(fields: [salespersonId], references: [id], onDelete: SetNull)
+  items       OrderItem[]
+  commissions Commission[]
+
+  @@index([customerId])
+  @@index([salespersonId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Decimal @db.Decimal(12, 3)
+  unitPrice Decimal @db.Decimal(12, 2) // preço no momento do pedido (não muda se o preço do produto mudar depois)
+  discount  Decimal @default(0) @db.Decimal(12, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+enum CommissionStatus {
+  PENDENTE
+  PAGA
+}
+
+model Commission {
+  id            String           @id @default(cuid())
+  orderId       String           @unique
+  salespersonId String
+  baseAmount    Decimal          @db.Decimal(12, 2)
+  rate          Decimal          @db.Decimal(5, 2)
+  amount        Decimal          @db.Decimal(12, 2)
+  status        CommissionStatus @default(PENDENTE)
+  paidAt        DateTime?
+  createdAt     DateTime         @default(now())
+
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  salesperson Salesperson @relation(fields: [salespersonId], references: [id], onDelete: Cascade)
+
+  @@index([salespersonId])
+  @@map("commissions")
 }

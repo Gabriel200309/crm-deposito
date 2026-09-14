@@ -11,6 +11,9 @@ export const MODULES = {
   LEADS: "leads",
   PRODUTOS: "produtos",
   ESTOQUE: "estoque",
+  PEDIDOS: "pedidos",
+  VENDEDORES: "vendedores",
+  COMISSOES: "comissoes",
 } as const;
 
 export type ModuleName = (typeof MODULES)[keyof typeof MODULES];
@@ -23,6 +26,9 @@ export const MODULE_LABELS: Record<string, string> = {
   [MODULES.LEADS]: "Leads e funil",
   [MODULES.PRODUTOS]: "Produtos",
   [MODULES.ESTOQUE]: "Estoque",
+  [MODULES.PEDIDOS]: "Orçamentos e pedidos",
+  [MODULES.VENDEDORES]: "Vendedores",
+  [MODULES.COMISSOES]: "Comissões",
 };
 
 export const ACTION_LABELS: Record<PermissionAction, string> = {
