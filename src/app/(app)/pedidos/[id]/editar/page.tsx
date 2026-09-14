@@ -70,6 +70,8 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
           deliveryAddressZip: order.deliveryAddressZip,
           discount: order.discount.toString(),
           freight: order.freight.toString(),
+          installments: order.installments,
+          firstDueDate: order.firstDueDate ? order.firstDueDate.toISOString().slice(0, 10) : null,
           notes: order.notes,
           items: order.items.map((item) => ({
             productId: item.productId,

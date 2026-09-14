@@ -11,6 +11,7 @@ import {
   formatMoney,
 } from "@/lib/order-labels";
 import { calculateItemSubtotal, calculateOrderSubtotal, calculateOrderTotal } from "@/lib/order-totals";
+import { computeReceivableStatus, RECEIVABLE_STATUS_LABELS, type ReceivableComputedStatus } from "@/lib/finance-labels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,15 @@ import {
 } from "@/components/ui/table";
 import { StatusChanger } from "./status-changer";
 import { DeliveryType, OrderStatus } from "@/generated/prisma/enums";
+import { RegisterPaymentDialog } from "../../financeiro/receber/register-payment-dialog";
+
+const STATUS_BADGE_VARIANT: Record<ReceivableComputedStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  ABERTO: "outline",
+  PARCIALMENTE_PAGO: "secondary",
+  PAGO: "default",
+  VENCIDO: "destructive",
+  CANCELADO: "secondary",
+};
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requirePermission(MODULES.PEDIDOS, PermissionAction.VIEW);
@@ -36,11 +46,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       salesperson: { include: { user: { select: { name: true } } } },
       items: { include: { product: { include: { unit: true } } } },
       commissions: true,
+      receivables: { include: { payments: true }, orderBy: { installmentNumber: "asc" } },
     },
   });
   if (!order) notFound();
 
   const canEdit = await hasPermission(actor.roleId, MODULES.PEDIDOS, PermissionAction.EDIT);
+  const canRegisterPayment = await hasPermission(actor.roleId, MODULES.FINANCEIRO, PermissionAction.EDIT);
   const editable = isOrderEditable(order.status);
 
   const subtotal = calculateOrderSubtotal(
@@ -200,6 +212,62 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </CardContent>
         {order.notes && <CardContent className="border-t pt-4 text-sm whitespace-pre-wrap">{order.notes}</CardContent>}
       </Card>
+
+      {order.receivables.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Parcelas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Parcela</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Saldo</TableHead>
+                  <TableHead>Status</TableHead>
+                  {canRegisterPayment && <TableHead className="text-right">Ações</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {order.receivables.map((r) => {
+                  const totalPaid = r.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                  const status = computeReceivableStatus({
+                    amount: r.amount.toString(),
+                    dueDate: r.dueDate,
+                    totalPaid,
+                    cancelled: r.cancelled,
+                  });
+                  const remaining = Math.max(0, Number(r.amount) - totalPaid);
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        {r.installmentNumber}/{r.installmentsTotal}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Intl.DateTimeFormat("pt-BR").format(r.dueDate)}
+                      </TableCell>
+                      <TableCell>{formatMoney(r.amount)}</TableCell>
+                      <TableCell>{formatMoney(remaining)}</TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_BADGE_VARIANT[status]}>{RECEIVABLE_STATUS_LABELS[status]}</Badge>
+                      </TableCell>
+                      {canRegisterPayment && (
+                        <TableCell className="text-right">
+                          {status !== "PAGO" && status !== "CANCELADO" && (
+                            <RegisterPaymentDialog receivableId={r.id} remaining={remaining} />
+                          )}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {order.commissions.length > 0 && (
         <Card>

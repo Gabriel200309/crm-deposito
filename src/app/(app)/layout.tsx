@@ -15,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     canViewOrders,
     canViewSalespeople,
     canViewCommissions,
+    canViewFinance,
   ] = await Promise.all([
     hasPermission(user.roleId, MODULES.USUARIOS, PermissionAction.VIEW),
     hasPermission(user.roleId, MODULES.PERFIS, PermissionAction.VIEW),
@@ -25,6 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     hasPermission(user.roleId, MODULES.PEDIDOS, PermissionAction.VIEW),
     hasPermission(user.roleId, MODULES.VENDEDORES, PermissionAction.VIEW),
     hasPermission(user.roleId, MODULES.COMISSOES, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.FINANCEIRO, PermissionAction.VIEW),
   ]);
 
   const navItems: NavItem[] = [
@@ -36,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ...(canViewStock ? [{ href: "/estoque", label: "Estoque" }] : []),
     ...(canViewSalespeople ? [{ href: "/vendedores", label: "Vendedores" }] : []),
     ...(canViewCommissions ? [{ href: "/comissoes", label: "Comissões" }] : []),
+    ...(canViewFinance ? [{ href: "/financeiro/receber", label: "Financeiro" }] : []),
     ...(canViewUsers ? [{ href: "/usuarios", label: "Usuários" }] : []),
     ...(canViewRoles ? [{ href: "/perfis", label: "Perfis e permissões" }] : []),
   ];

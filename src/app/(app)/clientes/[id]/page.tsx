@@ -11,6 +11,8 @@ import {
   customerDocument,
 } from "@/lib/crm-labels";
 import { createActivityAction } from "@/lib/actions/activities";
+import { checkCustomerCredit } from "@/lib/credit";
+import { formatMoney } from "@/lib/order-labels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,9 +38,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   });
   if (!customer) notFound();
 
-  const [canEdit, canDelete] = await Promise.all([
+  const [canEdit, canDelete, credit] = await Promise.all([
     hasPermission(actor.roleId, MODULES.CLIENTES, PermissionAction.EDIT),
     hasPermission(actor.roleId, MODULES.CLIENTES, PermissionAction.DELETE),
+    checkCustomerCredit(customer.id, 0),
   ]);
 
   const addActivity = createActivityAction.bind(null, { customerId: customer.id }, `/clientes/${customer.id}`);
@@ -123,6 +126,30 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               )}
             </CardContent>
           </Card>
+
+          {credit.limit !== null && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Crédito</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+                <div>
+                  <p className="text-muted-foreground">Limite</p>
+                  <p>{formatMoney(credit.limit)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Utilizado</p>
+                  <p>{formatMoney(credit.used)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Disponível</p>
+                  <p className={credit.available < 0 ? "font-medium text-destructive" : "font-medium"}>
+                    {formatMoney(credit.available)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

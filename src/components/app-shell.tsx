@@ -17,6 +17,7 @@ import {
   ClipboardList,
   UserCog,
   Percent,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -47,6 +48,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/pedidos": ClipboardList,
   "/vendedores": UserCog,
   "/comissoes": Percent,
+  "/financeiro/receber": Wallet,
   "/usuarios": Users,
   "/perfis": ShieldCheck,
 };
