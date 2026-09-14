@@ -5,22 +5,37 @@ import { AppShell, type NavItem } from "@/components/app-shell";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
 
-  const [canViewUsers, canViewRoles, canViewCustomers, canViewLeads, canViewProducts, canViewStock] =
-    await Promise.all([
-      hasPermission(user.roleId, MODULES.USUARIOS, PermissionAction.VIEW),
-      hasPermission(user.roleId, MODULES.PERFIS, PermissionAction.VIEW),
-      hasPermission(user.roleId, MODULES.CLIENTES, PermissionAction.VIEW),
-      hasPermission(user.roleId, MODULES.LEADS, PermissionAction.VIEW),
-      hasPermission(user.roleId, MODULES.PRODUTOS, PermissionAction.VIEW),
-      hasPermission(user.roleId, MODULES.ESTOQUE, PermissionAction.VIEW),
-    ]);
+  const [
+    canViewUsers,
+    canViewRoles,
+    canViewCustomers,
+    canViewLeads,
+    canViewProducts,
+    canViewStock,
+    canViewOrders,
+    canViewSalespeople,
+    canViewCommissions,
+  ] = await Promise.all([
+    hasPermission(user.roleId, MODULES.USUARIOS, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.PERFIS, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.CLIENTES, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.LEADS, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.PRODUTOS, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.ESTOQUE, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.PEDIDOS, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.VENDEDORES, PermissionAction.VIEW),
+    hasPermission(user.roleId, MODULES.COMISSOES, PermissionAction.VIEW),
+  ]);
 
   const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard" },
     ...(canViewCustomers ? [{ href: "/clientes", label: "Clientes" }] : []),
     ...(canViewLeads ? [{ href: "/leads", label: "Funil de vendas" }] : []),
+    ...(canViewOrders ? [{ href: "/pedidos", label: "Orçamentos e pedidos" }] : []),
     ...(canViewProducts ? [{ href: "/produtos", label: "Produtos" }] : []),
     ...(canViewStock ? [{ href: "/estoque", label: "Estoque" }] : []),
+    ...(canViewSalespeople ? [{ href: "/vendedores", label: "Vendedores" }] : []),
+    ...(canViewCommissions ? [{ href: "/comissoes", label: "Comissões" }] : []),
     ...(canViewUsers ? [{ href: "/usuarios", label: "Usuários" }] : []),
     ...(canViewRoles ? [{ href: "/perfis", label: "Perfis e permissões" }] : []),
   ];

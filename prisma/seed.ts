@@ -14,6 +14,9 @@ const MODULES = {
   LEADS: "leads",
   PRODUTOS: "produtos",
   ESTOQUE: "estoque",
+  PEDIDOS: "pedidos",
+  VENDEDORES: "vendedores",
+  COMISSOES: "comissoes",
 } as const;
 
 const CRUD = [
@@ -25,7 +28,10 @@ const CRUD = [
 
 // Módulos de gestão usam CRUD completo; dashboard é só leitura. Estoque só
 // tem visualizar/criar — movimentações são registros imutáveis, não se
-// editam nem se excluem (corrige-se com uma nova movimentação).
+// editam nem se excluem (corrige-se com uma nova movimentação). Em pedidos,
+// "excluir" é usado como a permissão de cancelar/perder um pedido — mais
+// restrita que apenas editar/avançar o status. Comissões só tem
+// visualizar/editar (editar = marcar como paga).
 const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
   { module: MODULES.DASHBOARD, action: PermissionAction.VIEW },
   ...CRUD.map((action) => ({ module: MODULES.USUARIOS, action })),
@@ -35,6 +41,10 @@ const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
   ...CRUD.map((action) => ({ module: MODULES.PRODUTOS, action })),
   { module: MODULES.ESTOQUE, action: PermissionAction.VIEW },
   { module: MODULES.ESTOQUE, action: PermissionAction.CREATE },
+  ...CRUD.map((action) => ({ module: MODULES.PEDIDOS, action })),
+  ...CRUD.map((action) => ({ module: MODULES.VENDEDORES, action })),
+  { module: MODULES.COMISSOES, action: PermissionAction.VIEW },
+  { module: MODULES.COMISSOES, action: PermissionAction.EDIT },
 ];
 
 // Perfis padrão do sistema (seção 22 do escopo). Todo perfil recebe acesso ao
@@ -52,13 +62,27 @@ const ROLE_SEED = [
   {
     name: "Gerente",
     description: "Vendas, clientes, estoque, financeiro e relatórios.",
-    modules: [MODULES.CLIENTES, MODULES.LEADS, MODULES.PRODUTOS, MODULES.ESTOQUE],
+    modules: [
+      MODULES.CLIENTES,
+      MODULES.LEADS,
+      MODULES.PRODUTOS,
+      MODULES.ESTOQUE,
+      MODULES.PEDIDOS,
+      MODULES.VENDEDORES,
+      MODULES.COMISSOES,
+    ],
   },
   {
     name: "Vendedor",
     description: "Clientes, leads, orçamentos, pedidos e suas vendas.",
     modules: [MODULES.CLIENTES, MODULES.LEADS],
     viewOnlyModules: [MODULES.PRODUTOS],
+    // Vendedor cria e avança seus pedidos, mas não pode cancelar/marcar como
+    // perdido sozinho (ação de "excluir" em pedidos) — isso fica com o Gerente.
+    partialModules: [
+      { module: MODULES.PEDIDOS, actions: [PermissionAction.VIEW, PermissionAction.CREATE, PermissionAction.EDIT] },
+      { module: MODULES.COMISSOES, actions: [PermissionAction.VIEW] },
+    ],
   },
   {
     name: "Estoquista",
@@ -125,6 +149,9 @@ async function main() {
     roles.set(roleSeed.name, role);
 
     const viewOnlyModules = (roleSeed as { viewOnlyModules?: readonly string[] }).viewOnlyModules ?? [];
+    const partialModules =
+      (roleSeed as { partialModules?: readonly { module: string; actions: readonly PermissionAction[] }[] })
+        .partialModules ?? [];
     const grantedPermissionIds = roleSeed.allPermissions
       ? permissions.map((p) => p.id)
       : [
@@ -134,6 +161,11 @@ async function main() {
             .map((p) => p.id),
           ...permissions
             .filter((p) => viewOnlyModules.includes(p.module) && p.action === PermissionAction.VIEW)
+            .map((p) => p.id),
+          ...permissions
+            .filter((p) =>
+              partialModules.some((pm) => pm.module === p.module && pm.actions.includes(p.action)),
+            )
             .map((p) => p.id),
         ];
 
