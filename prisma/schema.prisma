@@ -81,6 +81,7 @@ model User {
   salesperson             Salesperson?
   receivablePaymentsTaken ReceivablePayment[]
   payablesCreated         AccountsPayable[]
+  driver                  Driver?
 
   @@map("users")
 }
@@ -546,6 +547,7 @@ model Order {
   items       OrderItem[]
   commissions Commission[]
   receivables AccountsReceivable[]
+  delivery    Delivery?
 
   @@index([customerId])
   @@index([salespersonId])
@@ -672,4 +674,65 @@ model AccountsPayable {
   @@index([dueDate])
   @@index([status])
   @@map("accounts_payable")
+}
+
+// ---------------------------------------------------------------------------
+// FASE 7 — Entregas: agendamento e rastreio das entregas dos pedidos com
+// `deliveryType = ENTREGA`. Pedidos com retirada na loja não passam por
+// aqui — o próprio status do pedido (FATURADO -> ENTREGUE) já cobre esse
+// caso, sem precisar de motorista/rota.
+//
+// Uma entrega é criada automaticamente (status AGENDADA) na mesma transação
+// que fatura o pedido. A partir daí, avançar EM_TRANSPORTE/ENTREGUE no
+// pedido passa a ser feito só por aqui (o seletor de status do pedido
+// bloqueia essas duas transições quando há entrega), pra não ter dois
+// lugares "donos" do mesmo estado.
+// ---------------------------------------------------------------------------
+
+model Driver {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  phone        String?
+  vehiclePlate String?
+  vehicleModel String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries Delivery[]
+
+  @@map("drivers")
+}
+
+enum DeliveryStatus {
+  AGENDADA
+  EM_ROTA
+  ENTREGUE
+  FALHOU
+  CANCELADA
+}
+
+model Delivery {
+  id            String         @id @default(cuid())
+  orderId       String         @unique
+  driverId      String?
+  status        DeliveryStatus @default(AGENDADA)
+  scheduledDate DateTime?
+  startedAt     DateTime?
+  deliveredAt   DateTime?
+  recipientName String?
+  failureReason String?
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order  Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  driver Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([driverId])
+  @@index([scheduledDate])
+  @@map("deliveries")
 }

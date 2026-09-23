@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import { MODULES, PermissionAction } from "@/lib/permissions";
-import { DeliveryType, OrderStatus, PaymentMethod, StockMovementType } from "@/generated/prisma/enums";
+import { DeliveryStatus, DeliveryType, OrderStatus, PaymentMethod, StockMovementType } from "@/generated/prisma/enums";
 import { ORDER_FINAL_STATUSES, ORDER_LOCKED_STATUSES, isOrderEditable } from "@/lib/order-labels";
 import { calculateOrderSubtotal, calculateOrderTotal } from "@/lib/order-totals";
 import { splitInstallments } from "@/lib/finance-labels";
@@ -202,6 +202,16 @@ export async function changeOrderStatusAction(
     };
   }
 
+  if (
+    (status === OrderStatus.EM_TRANSPORTE || status === OrderStatus.ENTREGUE) &&
+    order.deliveryType === DeliveryType.ENTREGA
+  ) {
+    return {
+      success: false,
+      error: "Pedidos com entrega avançam pelo módulo Entregas, não por aqui.",
+    };
+  }
+
   if (status === OrderStatus.FATURADO) {
     // Confere estoque suficiente para todos os itens antes de baixar.
     const products = await prisma.product.findMany({
@@ -305,6 +315,12 @@ export async function changeOrderStatusAction(
           },
         });
       }
+
+      if (order.deliveryType === DeliveryType.ENTREGA) {
+        await tx.delivery.create({
+          data: { orderId, status: DeliveryStatus.AGENDADA },
+        });
+      }
     });
   } else {
     await prisma.order.update({
@@ -331,5 +347,6 @@ export async function changeOrderStatusAction(
   revalidatePath("/produtos");
   revalidatePath("/comissoes");
   revalidatePath("/financeiro/receber");
+  revalidatePath("/entregas");
   return { success: true };
 }

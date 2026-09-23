@@ -7,6 +7,7 @@ import { customerDisplayName } from "@/lib/crm-labels";
 import {
   PAYMENT_METHOD_LABELS,
   DELIVERY_TYPE_LABELS,
+  DELIVERY_STATUS_LABELS,
   isOrderEditable,
   formatMoney,
 } from "@/lib/order-labels";
@@ -47,6 +48,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       items: { include: { product: { include: { unit: true } } } },
       commissions: true,
       receivables: { include: { payments: true }, orderBy: { installmentNumber: "asc" } },
+      delivery: { include: { driver: { include: { user: { select: { name: true } } } } } },
     },
   });
   if (!order) notFound();
@@ -86,7 +88,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          <StatusChanger orderId={order.id} status={order.status} />
+          <StatusChanger orderId={order.id} status={order.status} deliveryType={order.deliveryType} />
           {canEdit && editable && (
             <Button render={<Link href={`/pedidos/${order.id}/editar`} />} nativeButton={false} variant="outline">
               Editar
@@ -265,6 +267,48 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 })}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {order.delivery && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Entrega</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
+            <div>
+              <p className="text-muted-foreground">Status</p>
+              <p>
+                <Link href="/entregas" className="hover:underline">
+                  {DELIVERY_STATUS_LABELS[order.delivery.status]}
+                </Link>
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Motorista</p>
+              <p>{order.delivery.driver?.user.name ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Data prevista</p>
+              <p>
+                {order.delivery.scheduledDate
+                  ? new Intl.DateTimeFormat("pt-BR").format(order.delivery.scheduledDate)
+                  : "—"}
+              </p>
+            </div>
+            {order.delivery.failureReason && (
+              <div className="sm:col-span-3">
+                <p className="text-muted-foreground">Motivo da falha</p>
+                <p>{order.delivery.failureReason}</p>
+              </div>
+            )}
+            {order.delivery.recipientName && (
+              <div className="sm:col-span-3">
+                <p className="text-muted-foreground">Recebido por</p>
+                <p>{order.delivery.recipientName}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

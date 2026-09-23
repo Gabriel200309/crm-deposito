@@ -52,3 +52,19 @@ export async function getSalespersonScope(roleId: string, userId: string): Promi
   if (!salesperson) return { type: "none" };
   return { type: "own", salespersonId: salesperson.id };
 }
+
+export type DriverScope = { type: "all" } | { type: "own"; driverId: string } | { type: "none" };
+
+/**
+ * Escopo de visibilidade em entregas: quem pode excluir/cancelar entregas
+ * (Gerente/Administrador) vê e despacha tudo; um Entregador sem essa
+ * permissão vê só as entregas atribuídas ao seu próprio perfil de
+ * motorista — e nenhuma, se ele nem tiver um perfil de motorista associado.
+ */
+export async function getDriverScope(roleId: string, userId: string): Promise<DriverScope> {
+  const canViewAll = await hasPermission(roleId, MODULES.ENTREGAS, PermissionAction.DELETE);
+  if (canViewAll) return { type: "all" };
+  const driver = await prisma.driver.findUnique({ where: { userId } });
+  if (!driver) return { type: "none" };
+  return { type: "own", driverId: driver.id };
+}

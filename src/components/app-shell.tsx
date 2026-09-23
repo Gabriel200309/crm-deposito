@@ -18,6 +18,8 @@ import {
   UserCog,
   Percent,
   Wallet,
+  Truck,
+  Car,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -49,6 +51,8 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/vendedores": UserCog,
   "/comissoes": Percent,
   "/financeiro/receber": Wallet,
+  "/entregas": Truck,
+  "/motoristas": Car,
   "/usuarios": Users,
   "/perfis": ShieldCheck,
 };
