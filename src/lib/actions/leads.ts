@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import { MODULES, PermissionAction } from "@/lib/permissions";
 import { LeadSource, LeadStage } from "@/generated/prisma/client";
+import { parseDateOnly } from "@/lib/dates";
 
 export type ActionState = { success: boolean; error?: string };
 
@@ -56,7 +57,7 @@ function toLeadData(data: z.infer<typeof leadSchema>) {
     source: data.source,
     estimatedValue: data.estimatedValue ? data.estimatedValue : null,
     probability: data.probability ? Number(data.probability) : null,
-    expectedCloseDate: data.expectedCloseDate ? new Date(data.expectedCloseDate) : null,
+    expectedCloseDate: data.expectedCloseDate ? parseDateOnly(data.expectedCloseDate) : null,
     notes: data.notes || null,
   };
 }

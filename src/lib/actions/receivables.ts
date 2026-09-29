@@ -69,6 +69,7 @@ export async function registerReceivablePaymentAction(
   });
 
   revalidatePath("/financeiro/receber");
+  revalidatePath("/financeiro/fluxo-caixa");
   revalidatePath(`/pedidos/${receivable.orderId}`);
   return { success: true };
 }

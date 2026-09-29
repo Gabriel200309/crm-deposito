@@ -11,7 +11,11 @@ export default async function EditLeadPage({ params }: { params: Promise<{ id: s
 
   const [lead, customers, users] = await Promise.all([
     prisma.lead.findUnique({ where: { id } }),
-    prisma.customer.findMany({ where: { active: true }, orderBy: { createdAt: "desc" } }),
+    prisma.customer.findMany({
+      where: { active: true },
+      select: { id: true, type: true, fullName: true, companyName: true, tradeName: true },
+      orderBy: { createdAt: "desc" },
+    }),
     prisma.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   if (!lead) notFound();

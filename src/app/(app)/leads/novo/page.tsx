@@ -8,7 +8,11 @@ export default async function NewLeadPage() {
   await requirePermission(MODULES.LEADS, PermissionAction.CREATE);
 
   const [customers, users] = await Promise.all([
-    prisma.customer.findMany({ where: { active: true }, orderBy: { createdAt: "desc" } }),
+    prisma.customer.findMany({
+      where: { active: true },
+      select: { id: true, type: true, fullName: true, companyName: true, tradeName: true },
+      orderBy: { createdAt: "desc" },
+    }),
     prisma.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 

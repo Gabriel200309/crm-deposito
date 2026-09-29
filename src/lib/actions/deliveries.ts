@@ -7,6 +7,7 @@ import { requirePermission, getDriverScope } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import { MODULES, PermissionAction } from "@/lib/permissions";
 import { DeliveryStatus, OrderStatus } from "@/generated/prisma/enums";
+import { parseDateOnly } from "@/lib/dates";
 
 export type ActionState = { success: boolean; error?: string };
 
@@ -59,7 +60,7 @@ export async function scheduleDeliveryAction(
     where: { id: deliveryId },
     data: {
       driverId: parsed.data.driverId && parsed.data.driverId !== "none" ? parsed.data.driverId : null,
-      scheduledDate: parsed.data.scheduledDate ? new Date(parsed.data.scheduledDate) : null,
+      scheduledDate: parsed.data.scheduledDate ? parseDateOnly(parsed.data.scheduledDate) : null,
       // Reagendar uma entrega que tinha falhado a reabre para uma nova tentativa.
       status: delivery.status === DeliveryStatus.FALHOU ? DeliveryStatus.AGENDADA : delivery.status,
       failureReason: delivery.status === DeliveryStatus.FALHOU ? null : delivery.failureReason,
@@ -195,6 +196,7 @@ export async function failDeliveryAction(
   });
 
   revalidatePath("/entregas");
+  revalidatePath(`/pedidos/${access.delivery.orderId}`);
   return { success: true };
 }
 
@@ -221,5 +223,6 @@ export async function cancelDeliveryAction(deliveryId: string, reason?: string):
   });
 
   revalidatePath("/entregas");
+  revalidatePath(`/pedidos/${delivery.orderId}`);
   return { success: true };
 }

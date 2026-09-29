@@ -17,9 +17,16 @@ import { LeadSource } from "@/generated/prisma/enums";
 import { LEAD_SOURCE_LABELS } from "@/lib/crm-labels";
 import { customerDisplayName } from "@/lib/crm-labels";
 import type { ActionState } from "@/lib/actions/leads";
-import type { Customer } from "@/generated/prisma/client";
+import { CustomerType } from "@/generated/prisma/enums";
 
 type UserOption = { id: string; name: string };
+type CustomerOption = {
+  id: string;
+  type: CustomerType;
+  fullName: string | null;
+  companyName: string | null;
+  tradeName: string | null;
+};
 
 export function LeadForm({
   action,
@@ -29,7 +36,7 @@ export function LeadForm({
   mode,
 }: {
   action: (prevState: ActionState, formData: FormData) => Promise<ActionState>;
-  customers: Customer[];
+  customers: CustomerOption[];
   users: UserOption[];
   defaultValues?: {
     title: string;
