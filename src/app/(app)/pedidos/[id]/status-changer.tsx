@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ORDER_STATUS_LABELS } from "@/lib/order-labels";
 import { changeOrderStatusAction } from "@/lib/actions/orders";
-import { OrderStatus } from "@/generated/prisma/enums";
+import { DeliveryType, OrderStatus } from "@/generated/prisma/enums";
 
 const PRE_INVOICE_OPTIONS: OrderStatus[] = [
   OrderStatus.RASCUNHO,
@@ -34,11 +34,16 @@ const PRE_INVOICE_OPTIONS: OrderStatus[] = [
   OrderStatus.PERDIDO,
 ];
 
-function optionsFor(current: OrderStatus): OrderStatus[] {
+// Pedidos com entrega (deliveryType = ENTREGA) avançam de Faturado em diante
+// só pelo módulo Entregas (agendamento, rota, confirmação) — o seletor aqui
+// fica travado nesses estágios para não ter dois lugares "donos" do status.
+function optionsFor(current: OrderStatus, deliveryType: DeliveryType): OrderStatus[] {
   if (current === OrderStatus.FATURADO) {
+    if (deliveryType === DeliveryType.ENTREGA) return [OrderStatus.FATURADO];
     return [OrderStatus.FATURADO, OrderStatus.EM_TRANSPORTE, OrderStatus.ENTREGUE];
   }
   if (current === OrderStatus.EM_TRANSPORTE) {
+    if (deliveryType === DeliveryType.ENTREGA) return [OrderStatus.EM_TRANSPORTE];
     return [OrderStatus.EM_TRANSPORTE, OrderStatus.ENTREGUE];
   }
   if (current === OrderStatus.ENTREGUE || current === OrderStatus.CANCELADO || current === OrderStatus.PERDIDO) {
@@ -47,12 +52,20 @@ function optionsFor(current: OrderStatus): OrderStatus[] {
   return PRE_INVOICE_OPTIONS;
 }
 
-export function StatusChanger({ orderId, status }: { orderId: string; status: OrderStatus }) {
+export function StatusChanger({
+  orderId,
+  status,
+  deliveryType,
+}: {
+  orderId: string;
+  status: OrderStatus;
+  deliveryType: DeliveryType;
+}) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [reasonDialogStatus, setReasonDialogStatus] = useState<OrderStatus | null>(null);
   const [reason, setReason] = useState("");
-  const options = optionsFor(status);
+  const options = optionsFor(status, deliveryType);
   const disabled = options.length === 1;
 
   function apply(next: OrderStatus, changeReason?: string) {
@@ -93,6 +106,9 @@ export function StatusChanger({ orderId, status }: { orderId: string; status: Or
           ))}
         </SelectContent>
       </Select>
+      {disabled && deliveryType === DeliveryType.ENTREGA && (status === OrderStatus.FATURADO || status === OrderStatus.EM_TRANSPORTE) && (
+        <p className="text-xs text-muted-foreground">Avança pelo módulo Entregas.</p>
+      )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Dialog open={reasonDialogStatus !== null} onOpenChange={(open) => !open && setReasonDialogStatus(null)}>

@@ -7,12 +7,13 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import { MODULES, PermissionAction } from "@/lib/permissions";
-import { DeliveryType, OrderStatus, PaymentMethod, StockMovementType } from "@/generated/prisma/enums";
+import { DeliveryStatus, DeliveryType, OrderStatus, PaymentMethod, StockMovementType } from "@/generated/prisma/enums";
 import { ORDER_FINAL_STATUSES, ORDER_LOCKED_STATUSES, isOrderEditable } from "@/lib/order-labels";
 import { calculateOrderSubtotal, calculateOrderTotal } from "@/lib/order-totals";
 import { splitInstallments } from "@/lib/finance-labels";
 import { checkCustomerCredit } from "@/lib/credit";
 import { hasPermission } from "@/lib/rbac";
+import { parseDateOnly } from "@/lib/dates";
 
 export type ActionState = { success: boolean; error?: string };
 
@@ -83,7 +84,7 @@ function toOrderData(data: z.infer<typeof orderSchema>) {
   return {
     customerId: data.customerId,
     salespersonId: salespersonId || null,
-    validUntil: data.validUntil ? new Date(data.validUntil) : null,
+    validUntil: data.validUntil ? parseDateOnly(data.validUntil) : null,
     paymentMethod: data.paymentMethod,
     paymentTerms: data.paymentTerms || null,
     deliveryType: data.deliveryType,
@@ -95,7 +96,7 @@ function toOrderData(data: z.infer<typeof orderSchema>) {
     discount: data.discount || "0",
     freight: data.freight || "0",
     installments: data.installments ? Math.max(1, parseInt(data.installments, 10) || 1) : 1,
-    firstDueDate: data.firstDueDate ? new Date(data.firstDueDate) : null,
+    firstDueDate: data.firstDueDate ? parseDateOnly(data.firstDueDate) : null,
     notes: data.notes || null,
   };
 }
@@ -202,6 +203,16 @@ export async function changeOrderStatusAction(
     };
   }
 
+  if (
+    (status === OrderStatus.EM_TRANSPORTE || status === OrderStatus.ENTREGUE) &&
+    order.deliveryType === DeliveryType.ENTREGA
+  ) {
+    return {
+      success: false,
+      error: "Pedidos com entrega avançam pelo módulo Entregas, não por aqui.",
+    };
+  }
+
   if (status === OrderStatus.FATURADO) {
     // Confere estoque suficiente para todos os itens antes de baixar.
     const products = await prisma.product.findMany({
@@ -305,6 +316,12 @@ export async function changeOrderStatusAction(
           },
         });
       }
+
+      if (order.deliveryType === DeliveryType.ENTREGA) {
+        await tx.delivery.create({
+          data: { orderId, status: DeliveryStatus.AGENDADA },
+        });
+      }
     });
   } else {
     await prisma.order.update({
@@ -331,5 +348,6 @@ export async function changeOrderStatusAction(
   revalidatePath("/produtos");
   revalidatePath("/comissoes");
   revalidatePath("/financeiro/receber");
+  revalidatePath("/entregas");
   return { success: true };
 }

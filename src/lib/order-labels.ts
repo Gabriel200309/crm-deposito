@@ -1,4 +1,4 @@
-import { DeliveryType, OrderStatus, PaymentMethod } from "@/generated/prisma/enums";
+import { DeliveryStatus, DeliveryType, OrderStatus, PaymentMethod } from "@/generated/prisma/enums";
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   [OrderStatus.RASCUNHO]: "Rascunho",
@@ -63,6 +63,14 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 export const DELIVERY_TYPE_LABELS: Record<DeliveryType, string> = {
   [DeliveryType.RETIRADA]: "Retirada na loja",
   [DeliveryType.ENTREGA]: "Entrega",
+};
+
+export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
+  [DeliveryStatus.AGENDADA]: "Agendada",
+  [DeliveryStatus.EM_ROTA]: "Em rota",
+  [DeliveryStatus.ENTREGUE]: "Entregue",
+  [DeliveryStatus.FALHOU]: "Falhou",
+  [DeliveryStatus.CANCELADA]: "Cancelada",
 };
 
 export function formatMoney(value: unknown) {

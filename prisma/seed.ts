@@ -18,6 +18,8 @@ const MODULES = {
   VENDEDORES: "vendedores",
   COMISSOES: "comissoes",
   FINANCEIRO: "financeiro",
+  MOTORISTAS: "motoristas",
+  ENTREGAS: "entregas",
 } as const;
 
 const CRUD = [
@@ -50,14 +52,18 @@ const PERMISSION_SEED: Array<{ module: string; action: PermissionAction }> = [
   // prazo que estoura o limite de crédito do cliente).
   ...CRUD.map((action) => ({ module: MODULES.FINANCEIRO, action })),
   { module: MODULES.FINANCEIRO, action: PermissionAction.APPROVE },
+  ...CRUD.map((action) => ({ module: MODULES.MOTORISTAS, action })),
+  // Entregas: "excluir" é usado como a permissão de cancelar uma entrega —
+  // mesmo padrão de Pedidos.
+  ...CRUD.map((action) => ({ module: MODULES.ENTREGAS, action })),
 ];
 
 // Perfis padrão do sistema (seção 22 do escopo). Todo perfil recebe acesso ao
 // dashboard; os módulos abaixo são concedidos conforme cada fase é
-// implementada (Financeiro/Fiscal/Entregador ainda não têm módulo próprio,
-// então ficam só com o dashboard por enquanto). `viewOnlyModules` concede
-// apenas a permissão de visualizar (ex: vendedor/estoquista consultando o
-// catálogo sem poder alterar preços ou cadastro).
+// implementada (Fiscal ainda não tem módulo próprio, então fica só com o
+// dashboard por enquanto). `viewOnlyModules` concede apenas a permissão de
+// visualizar (ex: vendedor/estoquista consultando o catálogo sem poder
+// alterar preços ou cadastro).
 const ROLE_SEED = [
   {
     name: "Administrador",
@@ -76,6 +82,8 @@ const ROLE_SEED = [
       MODULES.VENDEDORES,
       MODULES.COMISSOES,
       MODULES.FINANCEIRO,
+      MODULES.MOTORISTAS,
+      MODULES.ENTREGAS,
     ],
   },
   {
@@ -103,7 +111,16 @@ const ROLE_SEED = [
     viewOnlyModules: [MODULES.PEDIDOS, MODULES.CLIENTES],
   },
   { name: "Fiscal", description: "Notas fiscais e documentos fiscais.", modules: [] },
-  { name: "Entregador", description: "Entregas atribuídas ao entregador.", modules: [] },
+  {
+    name: "Entregador",
+    description: "Entregas atribuídas ao entregador.",
+    modules: [],
+    // Só visualiza e atualiza status (iniciar rota / concluir / falha) —
+    // agendar, atribuir motorista e cancelar entrega fica com o Gerente.
+    partialModules: [
+      { module: MODULES.ENTREGAS, actions: [PermissionAction.VIEW, PermissionAction.EDIT] },
+    ],
+  },
 ];
 
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "gabriel.camiloo20211@gmail.com";

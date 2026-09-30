@@ -198,4 +198,5 @@ export async function toggleProductActiveAction(productId: string) {
   });
 
   revalidatePath("/produtos");
+  revalidatePath("/estoque");
 }

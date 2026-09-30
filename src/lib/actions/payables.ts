@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import { MODULES, PermissionAction } from "@/lib/permissions";
 import { PayableStatus, PaymentMethod } from "@/generated/prisma/enums";
+import { parseDateOnly } from "@/lib/dates";
 
 export type ActionState = { success: boolean; error?: string };
 
@@ -41,7 +42,7 @@ export async function createPayableAction(
     data: {
       description: parsed.data.description,
       supplierName: parsed.data.supplierName || null,
-      dueDate: new Date(parsed.data.dueDate),
+      dueDate: parseDateOnly(parsed.data.dueDate),
       amount: parsed.data.amount,
       paymentMethod: parsed.data.paymentMethod,
       notes: parsed.data.notes || null,
@@ -76,6 +77,7 @@ export async function markPayablePaidAction(payableId: string) {
   });
 
   revalidatePath("/financeiro/pagar");
+  revalidatePath("/financeiro/fluxo-caixa");
 }
 
 export async function cancelPayableAction(payableId: string) {
@@ -94,4 +96,5 @@ export async function cancelPayableAction(payableId: string) {
   });
 
   revalidatePath("/financeiro/pagar");
+  revalidatePath("/financeiro/fluxo-caixa");
 }

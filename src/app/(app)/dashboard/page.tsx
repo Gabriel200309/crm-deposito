@@ -1,28 +1,39 @@
 import Link from "next/link";
-import { Users, ShieldCheck, PackageSearch, Receipt, PackageX, AlertTriangle } from "lucide-react";
+import { Users, ShieldCheck, PackageSearch, Receipt, PackageX, AlertTriangle, Truck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireUser, hasPermission, getSalespersonScope } from "@/lib/rbac";
+import { requireUser, hasPermission, getSalespersonScope, getDriverScope } from "@/lib/rbac";
 import { MODULES, PermissionAction } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { formatMoney } from "@/lib/order-labels";
-import { OrderStatus } from "@/generated/prisma/enums";
+import { DeliveryStatus, OrderStatus } from "@/generated/prisma/enums";
 
 export default async function DashboardPage() {
   const user = await requireUser();
 
-  const [canViewStock, canViewOrders, canViewFinance, salespersonScope] = await Promise.all([
-    hasPermission(user.roleId, MODULES.ESTOQUE, PermissionAction.VIEW),
-    hasPermission(user.roleId, MODULES.PEDIDOS, PermissionAction.VIEW),
-    hasPermission(user.roleId, MODULES.FINANCEIRO, PermissionAction.VIEW),
-    getSalespersonScope(user.roleId, user.id),
-  ]);
+  const [canViewStock, canViewOrders, canViewFinance, canViewDeliveries, salespersonScope, driverScope] =
+    await Promise.all([
+      hasPermission(user.roleId, MODULES.ESTOQUE, PermissionAction.VIEW),
+      hasPermission(user.roleId, MODULES.PEDIDOS, PermissionAction.VIEW),
+      hasPermission(user.roleId, MODULES.FINANCEIRO, PermissionAction.VIEW),
+      hasPermission(user.roleId, MODULES.ENTREGAS, PermissionAction.VIEW),
+      getSalespersonScope(user.roleId, user.id),
+      getDriverScope(user.roleId, user.id),
+    ]);
 
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [activeUsers, roleCount, outOfStock, lowStockCandidates, ordersThisMonth, receivedThisMonth, overdueReceivables] =
-    await Promise.all([
+  const [
+    activeUsers,
+    roleCount,
+    outOfStock,
+    lowStockCandidates,
+    ordersThisMonth,
+    receivedThisMonth,
+    overdueReceivables,
+    pendingDeliveries,
+  ] = await Promise.all([
     prisma.user.count({ where: { active: true } }),
     prisma.role.count(),
     canViewStock ? prisma.product.count({ where: { active: true, currentStock: { lte: 0 } } }) : null,
@@ -61,6 +72,16 @@ export default async function DashboardPage() {
               ).length,
           )
       : null,
+    canViewDeliveries && driverScope.type !== "none"
+      ? prisma.delivery.count({
+          where: {
+            status: { in: [DeliveryStatus.AGENDADA, DeliveryStatus.EM_ROTA] },
+            driverId: driverScope.type === "own" ? driverScope.driverId : undefined,
+          },
+        })
+      : canViewDeliveries
+        ? 0
+        : null,
   ]);
   const lowStock = lowStockCandidates?.filter((p) => Number(p.currentStock) <= Number(p.minStock)).length ?? null;
 
@@ -162,6 +183,20 @@ export default async function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{overdueReceivables}</div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
+        {canViewDeliveries && (
+          <Link href="/entregas">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Entregas pendentes</CardTitle>
+                <Truck className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{pendingDeliveries}</div>
               </CardContent>
             </Card>
           </Link>

@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import { MODULES, PermissionAction } from "@/lib/permissions";
 import { ActivityType } from "@/generated/prisma/client";
+import { parseDateOnly } from "@/lib/dates";
 
 export type ActionState = { success: boolean; error?: string };
 
@@ -39,7 +40,7 @@ export async function createActivityAction(
       ...scope,
       type: parsed.data.type,
       description: parsed.data.description,
-      dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
+      dueDate: parsed.data.dueDate ? parseDateOnly(parsed.data.dueDate) : null,
       createdById: actor.id,
     },
   });

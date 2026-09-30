@@ -23,4 +23,5 @@ export async function markCommissionPaidAction(commissionId: string) {
   });
 
   revalidatePath("/comissoes");
+  revalidatePath(`/pedidos/${updated.orderId}`);
 }

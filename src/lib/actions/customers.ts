@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import { MODULES, PermissionAction } from "@/lib/permissions";
 import { CustomerClassification, CustomerType } from "@/generated/prisma/client";
+import { parseDateOnly } from "@/lib/dates";
 
 export type ActionState = { success: boolean; error?: string };
 
@@ -95,7 +96,7 @@ function toCustomerData(data: z.infer<typeof customerSchema>) {
     fullName: data.type === CustomerType.PF ? data.fullName : null,
     cpf: data.type === CustomerType.PF && data.cpf ? onlyDigits(data.cpf) : null,
     rg: data.type === CustomerType.PF ? data.rg || null : null,
-    birthDate: data.type === CustomerType.PF && data.birthDate ? new Date(data.birthDate) : null,
+    birthDate: data.type === CustomerType.PF && data.birthDate ? parseDateOnly(data.birthDate) : null,
     companyName: data.type === CustomerType.PJ ? data.companyName : null,
     tradeName: data.type === CustomerType.PJ ? data.tradeName || null : null,
     cnpj: data.type === CustomerType.PJ && data.cnpj ? onlyDigits(data.cnpj) : null,
